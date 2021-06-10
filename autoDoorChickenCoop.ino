@@ -13,9 +13,8 @@
 
 // The time of arduino sleeping in ms
 #define ACTIVE 20
-#define STANDBY 2000 // 3min = 36000 or 15min = 900000
-#define DOOR_MOVE_TIME 3000 //86000
-#define WAITING_TIME_BEFORE_CLOSE 0 //65000
+#define STANDBY 20000 // 3min = 36000 or 15min = 900000
+#define WAITING_TIME_BEFORE_CLOSE 10 // in minutes
 #define WAITING_TIME_LOCKER 1000 // 1 sec before do something else to be sure the magnet is free
 #define TURN_NBR 5    // Number of turn to open or close the door
 
@@ -133,8 +132,15 @@ void freeDoor() {
   prln("Door unlocked");
 }
 
-void setup()
-{
+void manageTimeBeforeCloseDoor() {
+  unsigned long waitingTimeBeforeCloseInSec = WAITING_TIME_BEFORE_CLOSE * 60;
+  for (int i = 0; i < waitingTimeBeforeCloseInSec; i++) {
+    delay(1000); //wait 1 second
+  }
+
+}
+
+void setup() {
   Serial.begin(115200);
   pinMode(DOOR_R1, OUTPUT);
   pinMode(DOOR_R2, OUTPUT);
@@ -157,31 +163,27 @@ void setup()
 
   int lux = analogRead(LUX_SENSOR);
   // Check lux value to init the door state
-  if (lux > 900)
-  {
+  if (lux > 900) {
     isDoorOpen = false;
     radioOff();
   }
-  else if (lux < 500)
-  {
+  else if (lux < 500) {
     isDoorOpen = true;
     radioOn();
   }
 
 }
 
-void loop()
-{
+void loop() {
 
   int lux = analogRead(LUX_SENSOR);
-  if (lux > 900 && isDoorOpen && !isInMoving)
-  {
-    delay(WAITING_TIME_BEFORE_CLOSE);
+  if (lux > 900 && isDoorOpen && !isInMoving) {
+    manageTimeBeforeCloseDoor();
     closeDoor();
   }
-  else if (lux < 500 && !isDoorOpen && !isInMoving)
+  else if (lux < 500 && !isDoorOpen && !isInMoving) {
     openDoor();
-
+  }
   if (isInMoving) {
     counter();
   }
