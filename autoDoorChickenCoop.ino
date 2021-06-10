@@ -1,9 +1,10 @@
 #define LUX_SENSOR A7
-#define DOOR_MAIN 2 // After R1 relay to switch off the motor
-#define DOOR_R1 3   // Inverser relay with + on NC and - on NO
-#define DOOR_R2 4   // Inverser relay with - on NC and + on NO
-#define RADIO 5
-#define LOCKER 6
+#define CODER A6
+#define DOOR_MAIN 12 // After R1 relay to switch off the motor
+#define DOOR_R1 11   // Inverser relay with + on NC and - on NO
+#define DOOR_R2 10   // Inverser relay with - on NC and + on NO
+#define RADIO 9
+#define LOCKER 8
 
 #define OPEN HIGH
 #define CLOSE LOW
@@ -11,18 +12,20 @@
 #define OFF HIGH
 
 // The time of arduino sleeping in ms
-#define ACTIVE 500
-#define STANDBY 500 // 3min = 36000 or 15min = 900000
-#define DOOR_MOVE_TIME 86000
-#define WAITING_TIME_BEFORE_CLOSE 65000
+#define ACTIVE 20
+#define STANDBY 2000 // 3min = 36000 or 15min = 900000
+#define DOOR_MOVE_TIME 3000 //86000
+#define WAITING_TIME_BEFORE_CLOSE 0 //65000
 #define WAITING_TIME_LOCKER 1000 // 1 sec before do something else to be sure the magnet is free
+#define TURN_NBR 5    // Number of turn to open or close the door
 
 bool isDoorOpen;
 bool isInMoving;
 bool toOpen;
 unsigned long time;
-unsigned long startDoorMovingTime;
 unsigned long sleepTime;
+unsigned int turn; // contain the current nomber of turn of the door motor
+bool turnCounted;  // true if this turn is already counted
 
 void prln(String str)
 {
@@ -39,7 +42,6 @@ void openDoor()
 {
   radioOn();
   freeDoor();
-  startDoorMovingTime = millis();
   digitalWrite(DOOR_R1, CLOSE);
   digitalWrite(DOOR_R2, CLOSE);
   digitalWrite(DOOR_MAIN, CLOSE);
@@ -55,12 +57,13 @@ void openDoor()
 // Manage door stop moving
 void isStopNeeded()
 {
-  if (isInMoving && ((millis() - startDoorMovingTime) >= DOOR_MOVE_TIME))
+  if (isInMoving && (turn >= TURN_NBR))
   {
     digitalWrite(DOOR_MAIN, OPEN);
     digitalWrite(DOOR_R1, OPEN);
     digitalWrite(DOOR_R2, OPEN);
     isInMoving = false;
+    turn = 0;
 
     if (toOpen)
     {
@@ -74,16 +77,15 @@ void isStopNeeded()
       radioOff();
       lockDoor();
     }
-  }
 
-  sleepTime = STANDBY;
+    sleepTime = STANDBY;
+  }
 }
 
 // Manage closing door
 // return the sleep value for arduino
 void closeDoor()
 {
-  startDoorMovingTime = millis();
   digitalWrite(DOOR_R1, OPEN);
   digitalWrite(DOOR_R2, OPEN);
   digitalWrite(DOOR_MAIN, CLOSE);
@@ -94,6 +96,18 @@ void closeDoor()
   sleepTime = ACTIVE;
 
   prln("Start Close");
+}
+
+void counter() {
+  if ((analogRead(CODER) > 10) && !turnCounted) {
+    turn++;
+    turnCounted = true;
+    pr("Number of turn = ");
+    Serial.println(turn);
+  }
+  else if ((analogRead(CODER) < 10) && turnCounted) {
+    turnCounted = false;
+  }
 }
 
 void radioOn()
@@ -127,6 +141,7 @@ void setup()
   pinMode(DOOR_MAIN, OUTPUT);
   pinMode(RADIO, OUTPUT);
   pinMode(LOCKER, OUTPUT);
+  pinMode(CODER, INPUT);
 
   digitalWrite(DOOR_MAIN, OPEN);
   digitalWrite(DOOR_R1, OPEN);
@@ -137,6 +152,8 @@ void setup()
   isInMoving = false;
   sleepTime = STANDBY;
   toOpen = false;
+  turnCounted = true;
+  turn = 0;
 
   int lux = analogRead(LUX_SENSOR);
   // Check lux value to init the door state
@@ -151,7 +168,6 @@ void setup()
     radioOn();
   }
 
-  startDoorMovingTime = millis();
 }
 
 void loop()
@@ -165,6 +181,10 @@ void loop()
   }
   else if (lux < 500 && !isDoorOpen && !isInMoving)
     openDoor();
+
+  if (isInMoving) {
+    counter();
+  }
 
   isStopNeeded();
 
