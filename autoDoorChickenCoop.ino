@@ -3,14 +3,19 @@
 #define DOOR_R1 3   // Inverser relay with + on NC and - on NO
 #define DOOR_R2 4   // Inverser relay with - on NC and + on NO
 #define RADIO 5
+#define LOCKER 6
 
 #define OPEN HIGH
 #define CLOSE LOW
+#define ON LOW
+#define OFF HIGH
 
 // The time of arduino sleeping in ms
 #define ACTIVE 500
-#define STANDBY 500 // 15min = 900000
+#define STANDBY 500 // 3min = 36000 or 15min = 900000
 #define DOOR_MOVE_TIME 86000
+#define WAITING_TIME_BEFORE_CLOSE 65000
+#define WAITING_TIME_LOCKER 1000 // 1 sec before do something else to be sure the magnet is free
 
 bool isDoorOpen;
 bool isInMoving;
@@ -33,6 +38,7 @@ void pr(String str)
 void openDoor()
 {
   radioOn();
+  freeDoor();
   startDoorMovingTime = millis();
   digitalWrite(DOOR_R1, CLOSE);
   digitalWrite(DOOR_R2, CLOSE);
@@ -66,6 +72,7 @@ void isStopNeeded()
       prln("Stop - Door Close");
       isDoorOpen = false;
       radioOff();
+      lockDoor();
     }
   }
 
@@ -91,14 +98,25 @@ void closeDoor()
 
 void radioOn()
 {
-  digitalWrite(RADIO, CLOSE);
+  digitalWrite(RADIO, ON);
   prln("Radio On");
 }
 
 void radioOff()
 {
-  digitalWrite(RADIO, OPEN);
+  digitalWrite(RADIO, OFF);
   prln("Radio Off");
+}
+
+void lockDoor() {
+  digitalWrite(LOCKER, ON);
+  prln("Door locked");
+}
+
+void freeDoor() {
+  digitalWrite(LOCKER, OFF);
+  delay(WAITING_TIME_LOCKER);
+  prln("Door unlocked");
 }
 
 void setup()
@@ -108,11 +126,13 @@ void setup()
   pinMode(DOOR_R2, OUTPUT);
   pinMode(DOOR_MAIN, OUTPUT);
   pinMode(RADIO, OUTPUT);
+  pinMode(LOCKER, OUTPUT);
 
   digitalWrite(DOOR_MAIN, OPEN);
   digitalWrite(DOOR_R1, OPEN);
   digitalWrite(DOOR_R2, OPEN);
-  digitalWrite(RADIO, OPEN);
+  digitalWrite(RADIO, OFF);
+  digitalWrite(LOCKER, OFF);
 
   isInMoving = false;
   sleepTime = STANDBY;
@@ -139,7 +159,10 @@ void loop()
 
   int lux = analogRead(LUX_SENSOR);
   if (lux > 900 && isDoorOpen && !isInMoving)
+  {
+    delay(WAITING_TIME_BEFORE_CLOSE);
     closeDoor();
+  }
   else if (lux < 500 && !isDoorOpen && !isInMoving)
     openDoor();
 
