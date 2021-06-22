@@ -1,5 +1,6 @@
 #define LUX_SENSOR A7
 #define CODER A6
+#define INTER A1
 #define DOOR_MAIN 12 // After R1 relay to switch off the motor
 #define DOOR_R1 11   // Inverser relay with + on NC and - on NO
 #define DOOR_R2 10   // Inverser relay with - on NC and + on NO
@@ -16,7 +17,7 @@
 #define STANDBY 20000 // 3min = 36000 or 15min = 900000
 #define WAITING_TIME_BEFORE_CLOSE 10 // in minutes
 #define WAITING_TIME_LOCKER 1000 // 1 sec before do something else to be sure the magnet is free
-#define TURN_NBR 5    // Number of turn to open or close the door
+#define TURN_NBR 20    // Number of turn to open or close the door
 
 bool isDoorOpen;
 bool isInMoving;
@@ -132,6 +133,13 @@ void freeDoor() {
   prln("Door unlocked");
 }
 
+bool isButton() {
+  if (analogRead(INTER) > 900) {
+    return true;
+  }
+  return false;
+}
+
 void manageTimeBeforeCloseDoor() {
   unsigned long waitingTimeBeforeCloseInSec = WAITING_TIME_BEFORE_CLOSE * 60;
   for (int i = 0; i < waitingTimeBeforeCloseInSec; i++) {
@@ -147,7 +155,6 @@ void setup() {
   pinMode(DOOR_MAIN, OUTPUT);
   pinMode(RADIO, OUTPUT);
   pinMode(LOCKER, OUTPUT);
-  pinMode(CODER, INPUT);
 
   digitalWrite(DOOR_MAIN, OPEN);
   digitalWrite(DOOR_R1, OPEN);
@@ -177,13 +184,15 @@ void setup() {
 void loop() {
 
   int lux = analogRead(LUX_SENSOR);
-  if (lux > 900 && isDoorOpen && !isInMoving) {
-    manageTimeBeforeCloseDoor();
+  if ((lux > 900 || isButton()) && isDoorOpen && !isInMoving) {
+    if (!isButton())
+      manageTimeBeforeCloseDoor();
     closeDoor();
   }
-  else if (lux < 500 && !isDoorOpen && !isInMoving) {
+  else if ((lux < 500 || isButton()) && !isDoorOpen && !isInMoving) {
     openDoor();
   }
+
   if (isInMoving) {
     counter();
   }
