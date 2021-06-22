@@ -69,10 +69,10 @@ void manageDoor(DoorRequest requestedState) {
 }
 
 // Manage opening door
-void openDoor()
+void doorOpen()
 {
   radioOn();
-  freeDoor();
+  doorFree();
   digitalWrite(DOOR_IN1, CLOSE);
   manageDoor(eOpen);
 
@@ -97,7 +97,7 @@ void isStopNeeded()
       doorState = eClosed;
       prln("Stop - Door Close");
       radioOff();
-      lockDoor();
+      doorLock();
     }
 
     sleepTime = STANDBY;
@@ -106,7 +106,7 @@ void isStopNeeded()
 
 // Manage closing door
 // return the sleep value for arduino
-void closeDoor()
+void doorClose()
 {
   manageDoor(eOpen);
 
@@ -138,12 +138,12 @@ void radioOff()
   prln("Radio Off");
 }
 
-void lockDoor() {
+void doorLock() {
   digitalWrite(LOCKER, ON);
   prln("Door locked");
 }
 
-void freeDoor() {
+void doorFree() {
   digitalWrite(LOCKER, OFF);
   delay(WAITING_TIME_LOCKER);
   prln("Door unlocked");
@@ -195,13 +195,14 @@ void setup() {
 void loop() {
 
   int lux = analogRead(LUX_SENSOR);
+
   if ((lux > 900 || isButton()) && ((doorState == eOpened) || (doorState == eUnknown))) {
     if (!isButton())
       manageTimeBeforeCloseDoor();
-    closeDoor();
+    doorClose();
   }
   else if ((lux < 500 || isButton()) && ((doorState == eClosed) || (doorState == eUnknown))) {
-    openDoor();
+    doorOpen();
   }
 
   if ((doorState == eOpenning) || (doorState == eClosing)) {
