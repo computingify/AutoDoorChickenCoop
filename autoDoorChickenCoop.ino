@@ -1,16 +1,31 @@
+#include <EEPROM.h>
+
 #define LUX_SENSOR A7
 #define CODER A6
 #define INTER A1
-#define DOOR_MAIN 12 // After R1 relay to switch off the motor
-#define DOOR_R1 11   // Inverser relay with + on NC and - on NO
-#define DOOR_R2 10   // Inverser relay with - on NC and + on NO
-#define RADIO 9
-#define LOCKER 8
+#define DOOR_IN1 3   // IN3 on H Bridge board
+#define DOOR_IN2 4   // IN4 on H Bridge board
+#define RADIO 12
+#define LOCKER 11
 
 #define OPEN HIGH
 #define CLOSE LOW
 #define ON LOW
 #define OFF HIGH
+
+typedef enum eDoorState {
+  eOpenning = 0,
+  eOpened,
+  eClosing,
+  eClosed,
+  eUnknown,
+}DoorState;
+
+typedef enum eDoorRequest {
+  eOpen = 0,
+  eClose,
+  eStop,
+}DoorRequest;
 
 // The time of arduino sleeping in ms
 #define ACTIVE 20
@@ -19,13 +34,11 @@
 #define WAITING_TIME_LOCKER 1000 // 1 sec before do something else to be sure the magnet is free
 #define TURN_NBR 20    // Number of turn to open or close the door
 
-bool isDoorOpen;
-bool isInMoving;
-bool toOpen;
 unsigned long time;
 unsigned long sleepTime;
 unsigned int turn; // contain the current nomber of turn of the door motor
 bool turnCounted;  // true if this turn is already counted
+DoorState doorState;
 
 void prln(String str)
 {
@@ -37,17 +50,31 @@ void pr(String str)
   Serial.print(str);
 }
 
+void manageDoor(DoorRequest requestedState) {
+  switch (requestedState) {
+  case eOpen:
+    digitalWrite(DOOR_IN1, HIGH);
+    digitalWrite(DOOR_IN2, LOW);
+    doorState = eOpenning;
+    break;
+  case eClose:
+    digitalWrite(DOOR_IN1, LOW);
+    digitalWrite(DOOR_IN2, HIGH);
+    doorState = eClosing;
+    break;
+  default:
+    digitalWrite(DOOR_IN1, LOW);
+    digitalWrite(DOOR_IN2, LOW);
+  }
+}
+
 // Manage opening door
 void openDoor()
 {
   radioOn();
   freeDoor();
-  digitalWrite(DOOR_R1, CLOSE);
-  digitalWrite(DOOR_R2, CLOSE);
-  digitalWrite(DOOR_MAIN, CLOSE);
-
-  toOpen = true;
-  isInMoving = true;
+  digitalWrite(DOOR_IN1, CLOSE);
+  manageDoor(eOpen);
 
   sleepTime = ACTIVE;
 
@@ -57,23 +84,18 @@ void openDoor()
 // Manage door stop moving
 void isStopNeeded()
 {
-  if (isInMoving && (turn >= TURN_NBR))
+  if (((doorState == eOpenning) || (doorState == eClosing)) && (turn >= TURN_NBR))
   {
-    digitalWrite(DOOR_MAIN, OPEN);
-    digitalWrite(DOOR_R1, OPEN);
-    digitalWrite(DOOR_R2, OPEN);
-    isInMoving = false;
+    manageDoor(eStop);
     turn = 0;
 
-    if (toOpen)
-    {
+    if (doorState == eOpenning) {
       prln("Stop - Door Open");
-      isDoorOpen = true;
+      doorState = eOpened;
     }
-    else
-    {
+    else {
+      doorState = eClosed;
       prln("Stop - Door Close");
-      isDoorOpen = false;
       radioOff();
       lockDoor();
     }
@@ -86,15 +108,9 @@ void isStopNeeded()
 // return the sleep value for arduino
 void closeDoor()
 {
-  digitalWrite(DOOR_R1, OPEN);
-  digitalWrite(DOOR_R2, OPEN);
-  digitalWrite(DOOR_MAIN, CLOSE);
-
-  toOpen = false;
-  isInMoving = true;
+  manageDoor(eOpen);
 
   sleepTime = ACTIVE;
-
   prln("Start Close");
 }
 
@@ -150,32 +166,27 @@ void manageTimeBeforeCloseDoor() {
 
 void setup() {
   Serial.begin(115200);
-  pinMode(DOOR_R1, OUTPUT);
-  pinMode(DOOR_R2, OUTPUT);
-  pinMode(DOOR_MAIN, OUTPUT);
+  doorState = eUnknown;
+  pinMode(DOOR_IN1, OUTPUT);
+  pinMode(DOOR_IN2, OUTPUT);
   pinMode(RADIO, OUTPUT);
   pinMode(LOCKER, OUTPUT);
 
-  digitalWrite(DOOR_MAIN, OPEN);
-  digitalWrite(DOOR_R1, OPEN);
-  digitalWrite(DOOR_R2, OPEN);
   digitalWrite(RADIO, OFF);
   digitalWrite(LOCKER, OFF);
 
-  isInMoving = false;
+  manageDoor(eStop);
+
   sleepTime = STANDBY;
-  toOpen = false;
   turnCounted = true;
   turn = 0;
 
   int lux = analogRead(LUX_SENSOR);
   // Check lux value to init the door state
   if (lux > 900) {
-    isDoorOpen = false;
     radioOff();
   }
   else if (lux < 500) {
-    isDoorOpen = true;
     radioOn();
   }
 
@@ -184,16 +195,16 @@ void setup() {
 void loop() {
 
   int lux = analogRead(LUX_SENSOR);
-  if ((lux > 900 || isButton()) && isDoorOpen && !isInMoving) {
+  if ((lux > 900 || isButton()) && ((doorState == eOpened) || (doorState == eUnknown))) {
     if (!isButton())
       manageTimeBeforeCloseDoor();
     closeDoor();
   }
-  else if ((lux < 500 || isButton()) && !isDoorOpen && !isInMoving) {
+  else if ((lux < 500 || isButton()) && ((doorState == eClosed) || (doorState == eUnknown))) {
     openDoor();
   }
 
-  if (isInMoving) {
+  if ((doorState == eOpenning) || (doorState == eClosing)) {
     counter();
   }
 
