@@ -29,7 +29,7 @@ typedef enum eDoorRequest {
 
 // The time of arduino sleeping in ms
 #define ACTIVE 20
-#define STANDBY 20000 // 3min = 36000 or 15min = 900000
+#define STANDBY 100 //20000 // 3min = 36000 or 15min = 900000
 #define WAITING_TIME_BEFORE_CLOSE 10 // in minutes
 #define WAITING_TIME_LOCKER 1000 // 1 sec before do something else to be sure the magnet is free
 #define TURN_NBR 20    // Number of turn to open or close the door
@@ -52,6 +52,7 @@ void pr(String str)
 }
 
 void eepromUpdateDoorState() {
+  //Serial.println("update EEPROM");
   EEPROM.write(eepromDoorStateAddr, doorState);
 
 }
@@ -63,20 +64,26 @@ DoorState eepromGetDoorState() {
 void manageDoor(DoorRequest requestedState) {
   switch (requestedState) {
   case eOpen:
+    Serial.println("Openning Door");
     digitalWrite(DOOR_IN1, HIGH);
     digitalWrite(DOOR_IN2, LOW);
     doorState = eOpenning;
+    prln("Door = eOpenning");
     break;
   case eClose:
+    Serial.println("Closing Door");
     digitalWrite(DOOR_IN1, LOW);
     digitalWrite(DOOR_IN2, HIGH);
     doorState = eClosing;
+    prln("Door = eClosing");
     break;
   default:
     digitalWrite(DOOR_IN1, LOW);
     digitalWrite(DOOR_IN2, LOW);
   }
   eepromUpdateDoorState();
+  pr("Door State = ");
+  Serial.println(doorState);
 }
 
 // Manage opening door
@@ -103,15 +110,21 @@ void isStopNeeded()
     if (doorState == eOpenning) {
       prln("Stop - Door Open");
       doorState = eOpened;
+
+      prln("Door = eOpened");
     }
     else {
       doorState = eClosed;
       prln("Stop - Door Close");
       radioOff();
       doorLock();
+
+      prln("Door = eClosed");
     }
 
     eepromUpdateDoorState();
+    pr("Door State = ");
+    Serial.println(doorState);
     sleepTime = STANDBY;
   }
 }
@@ -120,7 +133,7 @@ void isStopNeeded()
 // return the sleep value for arduino
 void doorClose()
 {
-  manageDoor(eOpen);
+  manageDoor(eClose);
 
   sleepTime = ACTIVE;
   prln("Start Close");
@@ -161,13 +174,6 @@ void doorFree() {
   prln("Door unlocked");
 }
 
-bool isButton() {
-  if (analogRead(INTER) > 900) {
-    return true;
-  }
-  return false;
-}
-
 void manageTimeBeforeCloseDoor() {
   unsigned long waitingTimeBeforeCloseInSec = WAITING_TIME_BEFORE_CLOSE * 60;
   for (int i = 0; i < waitingTimeBeforeCloseInSec; i++) {
@@ -193,7 +199,7 @@ void setup() {
   turnCounted = true;
   turn = 0;
 
-  doorState = eepromGetDoorState();
+  //doorState = eepromGetDoorState();
   pr("Startup Door State = ");
   Serial.println(doorState);
 }
@@ -202,12 +208,11 @@ void loop() {
 
   int lux = analogRead(LUX_SENSOR);
 
-  if ((lux > 900 || isButton()) && ((doorState == eOpened) || (doorState == eUnknown))) {
-    if (!isButton())
-      manageTimeBeforeCloseDoor();
+  if (lux > 900 && ((doorState == eOpened) || (doorState == eUnknown))) {
+    //manageTimeBeforeCloseDoor();
     doorClose();
   }
-  else if ((lux < 500 || isButton()) && ((doorState == eClosed) || (doorState == eUnknown))) {
+  else if (lux < 500 && ((doorState == eClosed) || (doorState == eUnknown))) {
     doorOpen();
   }
 
@@ -216,6 +221,8 @@ void loop() {
   }
 
   isStopNeeded();
+
+  //Serial.print(eepromGetDoorState());
 
   delay(sleepTime);
 }
