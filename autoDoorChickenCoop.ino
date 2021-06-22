@@ -25,6 +25,7 @@ typedef enum eDoorRequest {
   eOpen = 0,
   eClose,
   eStop,
+  eNo,
 }DoorRequest;
 
 // The time of arduino sleeping in ms
@@ -84,7 +85,6 @@ void doorOpen()
 {
   radioOn();
   doorFree();
-  digitalWrite(DOOR_IN1, CLOSE);
   manageDoor(eOpen);
 
   sleepTime = ACTIVE;
@@ -170,6 +170,35 @@ void manageTimeBeforeCloseDoor() {
 
 }
 
+unsigned long timeLux;
+bool luxHighDetected, luxLowDetected;
+DoorRequest luxFilter(int lux) {
+  if (lux > 900 && !luxHighDetected) {
+    timeLux = millis();
+    luxHighDetected = true;
+    luxLowDetected = false;
+    //Serial.println("lux ot CLOSE Detected");
+  }
+  else if ((millis() - timeLux) > 10000 && luxHighDetected) {
+    luxHighDetected = false;
+    //Serial.println("lux ot CLOSE Validat");
+    return eClose;
+  }
+
+  if (lux < 500 && !luxLowDetected) {
+    timeLux = millis();
+    luxLowDetected = true;
+    luxHighDetected = false;
+    //Serial.println("lux ot OPEN Detected");
+  }
+  else if ((millis() - timeLux) > 10000 && luxLowDetected) {
+    luxLowDetected = false;
+    //Serial.println("lux ot OPEN Validat");
+    return eOpen;
+  }
+  return eNo;
+}
+
 void setup() {
   Serial.begin(115200);
   doorState = eUnknown;
@@ -188,17 +217,20 @@ void setup() {
   turn = 0;
 
   doorState = eepromGetDoorState();
+  Serial.println(doorState);
 }
 
 void loop() {
 
   int lux = analogRead(LUX_SENSOR);
 
-  if (lux > 900 && ((doorState == eOpened) || (doorState == eUnknown))) {
+  DoorRequest req = luxFilter(lux);
+
+  if (req == eClose && ((doorState == eOpened) || (doorState == eUnknown))) {
     //manageTimeBeforeCloseDoor();
     doorClose();
   }
-  else if (lux < 500 && ((doorState == eClosed) || (doorState == eUnknown))) {
+  else if (req == eOpen && ((doorState == eClosed) || (doorState == eUnknown))) {
     doorOpen();
   }
 
