@@ -39,6 +39,7 @@ unsigned long sleepTime;
 unsigned int turn; // contain the current nomber of turn of the door motor
 bool turnCounted;  // true if this turn is already counted
 DoorState doorState;
+int eepromDoorStateAddr = 0;
 
 void prln(String str)
 {
@@ -48,6 +49,15 @@ void prln(String str)
 void pr(String str)
 {
   Serial.print(str);
+}
+
+void eepromUpdateDoorState() {
+  EEPROM.write(eepromDoorStateAddr, doorState);
+
+}
+
+DoorState eepromGetDoorState() {
+  return (DoorState)EEPROM.read(eepromDoorStateAddr);
 }
 
 void manageDoor(DoorRequest requestedState) {
@@ -66,6 +76,7 @@ void manageDoor(DoorRequest requestedState) {
     digitalWrite(DOOR_IN1, LOW);
     digitalWrite(DOOR_IN2, LOW);
   }
+  eepromUpdateDoorState();
 }
 
 // Manage opening door
@@ -100,6 +111,7 @@ void isStopNeeded()
       doorLock();
     }
 
+    eepromUpdateDoorState();
     sleepTime = STANDBY;
   }
 }
@@ -181,15 +193,9 @@ void setup() {
   turnCounted = true;
   turn = 0;
 
-  int lux = analogRead(LUX_SENSOR);
-  // Check lux value to init the door state
-  if (lux > 900) {
-    radioOff();
-  }
-  else if (lux < 500) {
-    radioOn();
-  }
-
+  doorState = eepromGetDoorState();
+  pr("Startup Door State = ");
+  Serial.println(doorState);
 }
 
 void loop() {
