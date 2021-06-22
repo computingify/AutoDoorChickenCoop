@@ -52,9 +52,7 @@ void pr(String str)
 }
 
 void eepromUpdateDoorState() {
-  //Serial.println("update EEPROM");
   EEPROM.write(eepromDoorStateAddr, doorState);
-
 }
 
 DoorState eepromGetDoorState() {
@@ -68,22 +66,17 @@ void manageDoor(DoorRequest requestedState) {
     digitalWrite(DOOR_IN1, HIGH);
     digitalWrite(DOOR_IN2, LOW);
     doorState = eOpenning;
-    prln("Door = eOpenning");
     break;
   case eClose:
     Serial.println("Closing Door");
     digitalWrite(DOOR_IN1, LOW);
     digitalWrite(DOOR_IN2, HIGH);
     doorState = eClosing;
-    prln("Door = eClosing");
     break;
   default:
     digitalWrite(DOOR_IN1, LOW);
     digitalWrite(DOOR_IN2, LOW);
   }
-  eepromUpdateDoorState();
-  pr("Door State = ");
-  Serial.println(doorState);
 }
 
 // Manage opening door
@@ -96,6 +89,7 @@ void doorOpen()
 
   sleepTime = ACTIVE;
 
+  eepromUpdateDoorState();
   prln("Start Open");
 }
 
@@ -110,21 +104,15 @@ void isStopNeeded()
     if (doorState == eOpenning) {
       prln("Stop - Door Open");
       doorState = eOpened;
-
-      prln("Door = eOpened");
     }
     else {
       doorState = eClosed;
       prln("Stop - Door Close");
       radioOff();
       doorLock();
-
-      prln("Door = eClosed");
     }
 
     eepromUpdateDoorState();
-    pr("Door State = ");
-    Serial.println(doorState);
     sleepTime = STANDBY;
   }
 }
@@ -199,9 +187,7 @@ void setup() {
   turnCounted = true;
   turn = 0;
 
-  //doorState = eepromGetDoorState();
-  pr("Startup Door State = ");
-  Serial.println(doorState);
+  doorState = eepromGetDoorState();
 }
 
 void loop() {
@@ -221,8 +207,6 @@ void loop() {
   }
 
   isStopNeeded();
-
-  //Serial.print(eepromGetDoorState());
 
   delay(sleepTime);
 }
