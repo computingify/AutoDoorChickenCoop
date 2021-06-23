@@ -5,7 +5,7 @@
 #define INTER A1
 #define DOOR_IN1 4   // IN3 on H Bridge board
 #define DOOR_IN2 3   // IN4 on H Bridge board
-#define RADIO 8
+#define RADIO 12
 #define LOCKER 11
 
 #define OPEN HIGH
@@ -202,11 +202,6 @@ DoorRequest luxFilter(int lux) {
 
 void setup() {
   Serial.begin(115200);
-  for (int i = 2; i < 12;i++) {
-    pinMode(i, OUTPUT);
-    digitalWrite(i, LOW);
-  }
-
   doorState = eUnknown;
   pinMode(DOOR_IN1, OUTPUT);
   pinMode(DOOR_IN2, OUTPUT);
@@ -224,6 +219,13 @@ void setup() {
 
   doorState = eepromGetDoorState();
   Serial.println(doorState);
+
+  if (doorState == eOpened) {
+    radioOn();
+  }
+  else if (doorState == eClosed) {
+    doorLock();
+  }
 }
 
 void loop() {
@@ -233,7 +235,7 @@ void loop() {
   DoorRequest req = luxFilter(lux);
 
   if (req == eClose && ((doorState == eOpened) || (doorState == eUnknown))) {
-    //manageTimeBeforeCloseDoor();
+    manageTimeBeforeCloseDoor();
     doorClose();
   }
   else if (req == eOpen && ((doorState == eClosed) || (doorState == eUnknown))) {
