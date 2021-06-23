@@ -34,6 +34,7 @@ typedef enum eDoorRequest {
 #define WAITING_TIME_BEFORE_CLOSE 10 // in minutes
 #define WAITING_TIME_LOCKER 1000 // 1 sec before do something else to be sure the magnet is free
 #define TURN_NBR 45    // Number of turn to open or close the door
+#define FILTER_TIME 10  // duration [sec] before verify if the lux state is the same (filter on lux, to prevent portable light flash on it)
 
 unsigned long time;
 unsigned long sleepTime;
@@ -179,7 +180,7 @@ DoorRequest luxFilter(int lux) {
     luxLowDetected = false;
     Serial.println("lux ot CLOSE Detected");
   }
-  else if ((millis() - timeLux) > 10000 && luxHighDetected) {
+  else if ((millis() - timeLux) > FILTER_TIME * 1000 && luxHighDetected) {
     luxHighDetected = false;
     Serial.println("lux ot CLOSE Validat");
     return eClose;
@@ -191,7 +192,7 @@ DoorRequest luxFilter(int lux) {
     luxHighDetected = false;
     Serial.println("lux ot OPEN Detected");
   }
-  else if ((millis() - timeLux) > 10000 && luxLowDetected) {
+  else if ((millis() - timeLux) > FILTER_TIME * 1000 && luxLowDetected) {
     luxLowDetected = false;
     Serial.println("lux ot OPEN Validat");
     return eOpen;
