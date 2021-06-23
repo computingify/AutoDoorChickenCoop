@@ -3,9 +3,9 @@
 #define LUX_SENSOR A7
 #define CODER A6
 #define INTER A1
-#define DOOR_IN1 3   // IN3 on H Bridge board
-#define DOOR_IN2 4   // IN4 on H Bridge board
-#define RADIO 12
+#define DOOR_IN1 4   // IN3 on H Bridge board
+#define DOOR_IN2 3   // IN4 on H Bridge board
+#define RADIO 8
 #define LOCKER 11
 
 #define OPEN HIGH
@@ -33,7 +33,7 @@ typedef enum eDoorRequest {
 #define STANDBY 100 //20000 // 3min = 36000 or 15min = 900000
 #define WAITING_TIME_BEFORE_CLOSE 10 // in minutes
 #define WAITING_TIME_LOCKER 1000 // 1 sec before do something else to be sure the magnet is free
-#define TURN_NBR 20    // Number of turn to open or close the door
+#define TURN_NBR 45    // Number of turn to open or close the door
 
 unsigned long time;
 unsigned long sleepTime;
@@ -163,9 +163,9 @@ void doorFree() {
 }
 
 void manageTimeBeforeCloseDoor() {
-  unsigned long waitingTimeBeforeCloseInSec = WAITING_TIME_BEFORE_CLOSE * 60;
+  unsigned long waitingTimeBeforeCloseInSec = WAITING_TIME_BEFORE_CLOSE;
   for (int i = 0; i < waitingTimeBeforeCloseInSec; i++) {
-    delay(1000); //wait 1 second
+    delay(60000); //wait 60 seconds
   }
 
 }
@@ -177,11 +177,11 @@ DoorRequest luxFilter(int lux) {
     timeLux = millis();
     luxHighDetected = true;
     luxLowDetected = false;
-    //Serial.println("lux ot CLOSE Detected");
+    Serial.println("lux ot CLOSE Detected");
   }
   else if ((millis() - timeLux) > 10000 && luxHighDetected) {
     luxHighDetected = false;
-    //Serial.println("lux ot CLOSE Validat");
+    Serial.println("lux ot CLOSE Validat");
     return eClose;
   }
 
@@ -189,11 +189,11 @@ DoorRequest luxFilter(int lux) {
     timeLux = millis();
     luxLowDetected = true;
     luxHighDetected = false;
-    //Serial.println("lux ot OPEN Detected");
+    Serial.println("lux ot OPEN Detected");
   }
   else if ((millis() - timeLux) > 10000 && luxLowDetected) {
     luxLowDetected = false;
-    //Serial.println("lux ot OPEN Validat");
+    Serial.println("lux ot OPEN Validat");
     return eOpen;
   }
   return eNo;
@@ -201,6 +201,11 @@ DoorRequest luxFilter(int lux) {
 
 void setup() {
   Serial.begin(115200);
+  for (int i = 2; i < 12;i++) {
+    pinMode(i, OUTPUT);
+    digitalWrite(i, LOW);
+  }
+
   doorState = eUnknown;
   pinMode(DOOR_IN1, OUTPUT);
   pinMode(DOOR_IN2, OUTPUT);
